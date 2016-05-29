@@ -47,7 +47,7 @@ func TestNewVideoStream(t *testing.T) {
 		t.Fatal("VideoStream did not set duration")
 	}
 	received := make([]byte, testSz)
-	if _, err := io.ReadFull(vs.fs, received); err != nil {
+	if _, err := io.ReadFull(vs.fs, received); err != io.EOF && err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(received, testData) {

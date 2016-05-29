@@ -17,7 +17,7 @@ const (
 	fudgeFactor = 1.2
 )
 
-// FileStream implements a ReadWriteSeeker for a remote file that is being streamed to a local file.
+// FileStream implements an io.ReadWriteSeeker for a remote file that is being streamed to a local file.
 type FileStream struct {
 	net  io.ReadSeeker
 	file io.WriteSeeker
@@ -48,7 +48,7 @@ func (fs FileStream) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// VideoStreamer concurrently reads from an underlying HTTP stream, measures available bandwidth,
+// VideoStreamer reads from an underlying HTTP stream, measures available bandwidth,
 // and tells the user when they can safely start plaing a video.
 type VideoStreamer struct {
 	Size     int64

@@ -36,15 +36,18 @@ func TestNewVideoStream(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	vs, err := NewVideoStream(ts.URL, time.Second, "testout.mkv")
+	vs, err := NewVideoStream(ts.URL, time.Second, "testout.mkv", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if vs.Size != testSz {
 		t.Fatalf("VideoStream created with wrong size, got %v wanted %v\n", vs.Size, testSz)
 	}
+	if vs.Duration != time.Second {
+		t.Fatal("VideoStream did not set duration")
+	}
 	received := make([]byte, testSz)
-	if _, err := io.ReadFull(vs.rd, received); err != nil {
+	if _, err := io.ReadFull(vs.fs, received); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(received, testData) {

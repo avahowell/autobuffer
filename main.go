@@ -3,26 +3,26 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/jfbus/httprs"
 	"io"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-	"github.com/jfbus/httprs"
 )
 
 const (
-	chunkSize   = 10000     // 10KB chunk size
-	testSize    = 30000000 // 30MB test size
+	chunkSize   = 10000 // 10KB chunk size
 	fudgeFactor = 1.2
 )
 
 // FileStream implements a ReadWriteSeeker for a remote file that is being streamed to a local file.
 type FileStream struct {
-	net io.ReadSeeker
+	net  io.ReadSeeker
 	file io.WriteSeeker
 }
+
 func (fs FileStream) Seek(offset int64, whence int) (int64, error) {
 	if _, err := fs.net.Seek(offset, whence); err != nil {
 		return 0, err
@@ -53,7 +53,7 @@ func (fs FileStream) Read(p []byte) (int, error) {
 type VideoStreamer struct {
 	Size     int64
 	Duration time.Duration
-	fs io.ReadWriteSeeker
+	fs       io.ReadWriteSeeker
 }
 
 // Construct a new video stream from an http URL.
@@ -84,26 +84,35 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 	return &vs, nil
 }
 
-// Stream the remote file into the local file, giving user feedback on progress until they can safely stream
-func (vs *VideoStreamer) StartStream() error {
-	// Compute the average maximum downstream speed over 30 chunks
-	fmt.Println("Calculating available downstream bandwidth...")
+// getBandwidth returns the average bandwidth (in bytes per second) between the user and the requested resource.
+// this bandwidth is computed by downloading 2000 chunks.
+func (vs *VideoStreamer) getBandwidth() (float64, error) {
+	tbefore := time.Now()
+	sz := chunkSize * 2000
+	buf := make([]byte, sz)
+	if _, err := io.ReadFull(vs.fs, buf); err != nil {
+		return 0, err
+	}
+	return float64(sz) / (time.Since(tbefore).Seconds()), nil
+}
 
-	tBefore := time.Now()
-	testBuf := make([]byte, testSize)
-	if _, err := io.ReadFull(vs.fs, testBuf); err != nil {
+// Stream the remote file into the local file, giving user feedback on progress until they can safely play the file.
+func (vs *VideoStreamer) StartStream() error {
+	fmt.Println("Calculating available downstream bandwidth...")
+	bw, err := vs.getBandwidth()
+	if err != nil {
 		return err
 	}
-	elapsedSeconds := time.Since(tBefore).Seconds()
-	availableBandwidth := testSize / elapsedSeconds
-	downloadTime := (availableBandwidth / float64(vs.Size)) * fudgeFactor
+	fmt.Printf("Average bandwidth: %v Bytes per second\n", bw)
+
+	// Calculate the amount of time needed to safely play the remote video.
+	downloadTime := (bw / float64(vs.Size)) * fudgeFactor
 	bufferTime := math.Max(0, downloadTime-vs.Duration.Seconds())
 
-	fmt.Println("Buffering your video...")
+	fmt.Printf("Now buffering your video. %v seconds until you can safely watch this video.\n", bufferTime)
 	chunk := make([]byte, chunkSize)
-
-	// Download the last 10KB first for video format integrity
-	if _, err := vs.fs.Seek(vs.Size - chunkSize, 0); err != nil {
+	// Download and write the last chunk first so video players can read the file correctly.
+	if _, err := vs.fs.Seek(vs.Size-chunkSize, 0); err != nil {
 		return err
 	}
 	io.ReadFull(vs.fs, chunk)
@@ -115,12 +124,12 @@ func (vs *VideoStreamer) StartStream() error {
 	if _, err := vs.fs.Seek(0, 0); err != nil {
 		return err
 	}
-	tBefore = time.Now()
+	tstart := time.Now()
 	readynotified := false
 	done := false
 	for !done {
-		if time.Since(tBefore).Seconds() > bufferTime && !readynotified {
-			fmt.Println("This video is ready to play.")
+		if time.Since(tstart).Seconds() > bufferTime && !readynotified {
+			fmt.Println("This video is now ready to play.")
 			readynotified = true
 		}
 		if _, err := io.ReadFull(vs.fs, chunk); err == io.ErrUnexpectedEOF {

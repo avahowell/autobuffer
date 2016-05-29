@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"os"
 	"io"
+	"time"
 	"reflect"
 )
 const (
@@ -33,7 +34,7 @@ func TestNewVideoStream(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	vs, err := NewVideoStream(ts.URL, "testout.mkv")
+	vs, err := NewVideoStream(ts.URL, time.Second, "testout.mkv")
 	if err != nil {
 		t.Fatal(err)
 	}

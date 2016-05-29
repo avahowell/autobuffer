@@ -1,20 +1,22 @@
 package main
 
 import (
-	"testing"
-	"net/http/httptest"
-	"net/http"
 	"crypto/rand"
-	"strconv"
-	"os"
 	"io"
-	"time"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"reflect"
+	"strconv"
+	"testing"
+	"time"
 )
+
 const (
-	testSz = 1000
+	testSz       = 1000
 	testFilename = "testout.mkv"
 )
+
 var (
 	testData = make([]byte, testSz)
 )
@@ -24,7 +26,7 @@ func TestNewVideoStream(t *testing.T) {
 	_, err := rand.Read(testData)
 	if err != nil {
 		t.Fatal(err)
-	}	
+	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Length", strconv.Itoa(testSz))
 		_, err := w.Write(testData)
@@ -45,7 +47,7 @@ func TestNewVideoStream(t *testing.T) {
 	if _, err := io.ReadFull(vs.rd, received); err != nil {
 		t.Fatal(err)
 	}
-	if (!reflect.DeepEqual(received, testData)) {
+	if !reflect.DeepEqual(received, testData) {
 		t.Fatal("VideoStream did not set the expected underlying reader interface")
 	}
 	if _, err := os.Stat(testFilename); os.IsNotExist(err) {

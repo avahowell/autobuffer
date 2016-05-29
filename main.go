@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -10,10 +9,11 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"github.com/jfbus/httprs"
 )
 
 const (
-	chunkSize   = 1000     // 1KB chunk size
+	chunkSize   = 10000     // 10KB chunk size
 	testSize    = 30000000 // 30MB test size
 	fudgeFactor = 1.2
 )
@@ -21,10 +21,10 @@ const (
 // VideoStreamer concurrently reads from an underlying HTTP stream, measures available bandwidth,
 // and tells the user when they can safely start plaing a video.
 type VideoStreamer struct {
-	Size     int
+	Size     int64
 	Duration time.Duration
-	rd       io.Reader
-	out      io.Writer
+	rs       io.ReadSeeker
+	out      io.WriteSeeker
 }
 
 // Construct a new video stream from an http URL.
@@ -49,9 +49,9 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 	if err != nil {
 		return nil, err
 	}
-	vs.Size = sz
+	vs.Size = int64(sz)
 	vs.Duration = duration
-	vs.rd = res.Body
+	vs.rs = httprs.NewHttpReadSeeker(res, http.DefaultClient)
 	vs.out = f
 	return &vs, nil
 }
@@ -63,8 +63,7 @@ func (vs *VideoStreamer) StartStream() error {
 
 	tBefore := time.Now()
 	testBuf := make([]byte, testSize)
-	rcvbuf := bufio.NewReader(vs.rd)
-	if _, err := io.ReadFull(rcvbuf, testBuf); err != nil {
+	if _, err := io.ReadFull(vs.rs, testBuf); err != nil {
 		return err
 	}
 	elapsedSeconds := time.Since(tBefore).Seconds()
@@ -73,20 +72,39 @@ func (vs *VideoStreamer) StartStream() error {
 	bufferTime := math.Max(0, downloadTime-vs.Duration.Seconds())
 
 	fmt.Println("Buffering your video...")
-	rcvbuf.Reset(vs.rd)
+	chunk := make([]byte, chunkSize)
+
+	// Download the last 10KB first for video format integrity
+	if _, err := vs.rs.Seek(vs.Size - chunkSize, 0); err != nil {
+		return err
+	}
+	if _, err := vs.out.Seek(vs.Size - chunkSize, 0); err != nil {
+		return err
+	}
+	io.ReadFull(vs.rs, chunk)
+	if _, err := vs.out.Write(chunk); err != nil {
+		return err
+	}
+
+	// Start streaming from the start of the file.
+	if _, err := vs.rs.Seek(0, 0); err != nil {
+		return err
+	}
+	if _, err := vs.out.Seek(0, 0); err != nil {
+		return err
+	}
 	tBefore = time.Now()
 	readynotified := false
-
 	for {
 		if time.Since(tBefore).Seconds() > bufferTime && !readynotified {
 			fmt.Println("This video is ready to play.")
 			readynotified = true
 		}
-		chunk := make([]byte, chunkSize)
-		if _, err := io.ReadFull(rcvbuf, chunk); err == io.ErrUnexpectedEOF {
+		if _, err := io.ReadFull(vs.rs, chunk); err == io.ErrUnexpectedEOF {
+			if _, err := vs.out.Write(chunk); err != nil {
+				return err
+			}
 			break
-		} else if err != nil {
-			return err
 		}
 		if _, err := vs.out.Write(chunk); err != nil {
 			return err
@@ -115,6 +133,6 @@ func main() {
 		fmt.Printf("Error creating video stream: %v\n", err)
 	}
 	if err = vs.StartStream(); err != nil {
-		fmt.Printf("Error streaming %v: %v\n", videourl)
+		fmt.Printf("Error streaming %v: %v\n", *videourl, err)
 	}
 }

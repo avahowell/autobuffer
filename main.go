@@ -18,13 +18,42 @@ const (
 	fudgeFactor = 1.2
 )
 
+// FileStream implements a ReadWriteSeeker for a remote file that is being streamed to a local file.
+type FileStream struct {
+	net io.ReadSeeker
+	file io.WriteSeeker
+}
+func (fs FileStream) Seek(offset int64, whence int) (int64, error) {
+	if _, err := fs.net.Seek(offset, whence); err != nil {
+		return 0, err
+	}
+	n, err := fs.file.Seek(offset, whence)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+func (fs FileStream) Write(p []byte) (int, error) {
+	n, err := fs.file.Write(p)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+func (fs FileStream) Read(p []byte) (int, error) {
+	n, err := fs.net.Read(p)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // VideoStreamer concurrently reads from an underlying HTTP stream, measures available bandwidth,
 // and tells the user when they can safely start plaing a video.
 type VideoStreamer struct {
 	Size     int64
 	Duration time.Duration
-	rs       io.ReadSeeker
-	out      io.WriteSeeker
+	fs io.ReadWriteSeeker
 }
 
 // Construct a new video stream from an http URL.
@@ -51,8 +80,7 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 	}
 	vs.Size = int64(sz)
 	vs.Duration = duration
-	vs.rs = httprs.NewHttpReadSeeker(res, http.DefaultClient)
-	vs.out = f
+	vs.fs = FileStream{net: httprs.NewHttpReadSeeker(res, http.DefaultClient), file: f}
 	return &vs, nil
 }
 
@@ -63,7 +91,7 @@ func (vs *VideoStreamer) StartStream() error {
 
 	tBefore := time.Now()
 	testBuf := make([]byte, testSize)
-	if _, err := io.ReadFull(vs.rs, testBuf); err != nil {
+	if _, err := io.ReadFull(vs.fs, testBuf); err != nil {
 		return err
 	}
 	elapsedSeconds := time.Since(tBefore).Seconds()
@@ -75,40 +103,32 @@ func (vs *VideoStreamer) StartStream() error {
 	chunk := make([]byte, chunkSize)
 
 	// Download the last 10KB first for video format integrity
-	if _, err := vs.rs.Seek(vs.Size - chunkSize, 0); err != nil {
+	if _, err := vs.fs.Seek(vs.Size - chunkSize, 0); err != nil {
 		return err
 	}
-	if _, err := vs.out.Seek(vs.Size - chunkSize, 0); err != nil {
-		return err
-	}
-	io.ReadFull(vs.rs, chunk)
-	if _, err := vs.out.Write(chunk); err != nil {
+	io.ReadFull(vs.fs, chunk)
+	if _, err := vs.fs.Write(chunk); err != nil {
 		return err
 	}
 
 	// Start streaming from the start of the file.
-	if _, err := vs.rs.Seek(0, 0); err != nil {
-		return err
-	}
-	if _, err := vs.out.Seek(0, 0); err != nil {
+	if _, err := vs.fs.Seek(0, 0); err != nil {
 		return err
 	}
 	tBefore = time.Now()
 	readynotified := false
-	for {
+	done := false
+	for !done {
 		if time.Since(tBefore).Seconds() > bufferTime && !readynotified {
 			fmt.Println("This video is ready to play.")
 			readynotified = true
 		}
-		if _, err := io.ReadFull(vs.rs, chunk); err == io.ErrUnexpectedEOF {
-			if _, err := vs.out.Write(chunk); err != nil {
-				return err
-			}
-			break
-		}
-		if _, err := vs.out.Write(chunk); err != nil {
+		if _, err := io.ReadFull(vs.fs, chunk); err == io.ErrUnexpectedEOF {
+			done = true
+		} else if err != nil {
 			return err
 		}
+		vs.fs.Write(chunk)
 	}
 	return nil
 }

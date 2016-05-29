@@ -10,8 +10,7 @@ import (
 const (
 	chunkSize = 1000 // 1MB chunk size
 )
-// VideoStreamer implements a io.Reader interface.
-// It concurrently reads from an underlying HTTP stream, measures available bandwidth,
+// VideoStreamer concurrently reads from an underlying HTTP stream, measures available bandwidth,
 // and tells the user when they can safely start plaing a video.
 type VideoStreamer struct {
 	Size int
@@ -30,7 +29,6 @@ func NewVideoStream(url string, outfile string) (*VideoStreamer, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	vs := VideoStreamer{}
 	sz, err := strconv.Atoi(res.Header["Content-Length"][0])
 	if err != nil {

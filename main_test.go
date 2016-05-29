@@ -7,6 +7,8 @@ import (
 	"crypto/rand"
 	"strconv"
 	"os"
+	"io"
+	"reflect"
 )
 const (
 	testSz = 1000
@@ -37,6 +39,13 @@ func TestNewVideoStream(t *testing.T) {
 	}
 	if vs.Size != testSz {
 		t.Fatalf("VideoStream created with wrong size, got %v wanted %v\n", vs.Size, testSz)
+	}
+	received := make([]byte, testSz)
+	if _, err := io.ReadFull(vs.rd, received); err != nil {
+		t.Fatal(err)
+	}
+	if (!reflect.DeepEqual(received, testData)) {
+		t.Fatal("VideoStream did not set the expected underlying reader interface")
 	}
 	if _, err := os.Stat(testFilename); os.IsNotExist(err) {
 		t.Fatal("VideoStream did not create outfile")

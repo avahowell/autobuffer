@@ -3,26 +3,33 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/jfbus/httprs"
 	"io"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/jfbus/httprs"
 )
 
 const (
-	chunkSize   = 10000 // 10KB chunk size
+	chunkSize = 10000 // 10KB chunk size
+
+	// fudgeFactor is used to overestimate buffering time in order to account for
+	// small variation in available bandwidth over the duration of the stream.
 	fudgeFactor = 1.2
 )
 
-// FileStream implements an io.ReadWriteSeeker for a remote file that is being streamed to a local file.
+// FileStream implements an io.ReadWriteSeeker for a remote file that is being
+// streamed to a local file.
 type FileStream struct {
 	net  io.ReadSeeker
 	file io.WriteSeeker
 }
 
+// Seek seeks both the remote and the local files to the same offset and
+// whence.
 func (fs FileStream) Seek(offset int64, whence int) (int64, error) {
 	if _, err := fs.net.Seek(offset, whence); err != nil {
 		return 0, err
@@ -33,6 +40,8 @@ func (fs FileStream) Seek(offset int64, whence int) (int64, error) {
 	}
 	return n, nil
 }
+
+// Write writes to the local file.
 func (fs FileStream) Write(p []byte) (int, error) {
 	n, err := fs.file.Write(p)
 	if err != nil {
@@ -40,6 +49,8 @@ func (fs FileStream) Write(p []byte) (int, error) {
 	}
 	return n, nil
 }
+
+// Read reads from the remote file.
 func (fs FileStream) Read(p []byte) (int, error) {
 	n, err := fs.net.Read(p)
 	if err != nil {
@@ -48,15 +59,17 @@ func (fs FileStream) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// VideoStreamer reads from an underlying HTTP stream, measures available bandwidth,
-// and tells the user when they can safely start plaing a video.
+// VideoStreamer reads from an underlying HTTP stream, measures available
+// bandwidth, buffers the remote file to the local file, and tells the user
+// when they can safely start plaing a video.
 type VideoStreamer struct {
 	Size     int64
 	Duration time.Duration
-	fs       io.ReadWriteSeeker
+	fs       *FileStream
 }
 
-// Construct a new video stream from an http URL.
+// NewVideoStream constructs a new video stream from an http URL, duration,
+// output path, and optionally HTTP Basic Auth parameters.
 func NewVideoStream(url string, duration time.Duration, outfile string, username string, password string) (*VideoStreamer, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -73,19 +86,24 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 	if err != nil {
 		return nil, err
 	}
-	vs := VideoStreamer{}
 	sz, err := strconv.Atoi(res.Header["Content-Length"][0])
 	if err != nil {
 		return nil, err
 	}
-	vs.Size = int64(sz)
-	vs.Duration = duration
-	vs.fs = FileStream{net: httprs.NewHttpReadSeeker(res, http.DefaultClient), file: f}
-	return &vs, nil
+
+	return &VideoStreamer{
+		Size:     int64(sz),
+		Duration: duration,
+		fs: &FileStream{
+			net:  httprs.NewHttpReadSeeker(res, http.DefaultClient),
+			file: f,
+		},
+	}, nil
 }
 
-// getBandwidth returns the average bandwidth (in bytes per second) between the user and the requested resource.
-// this bandwidth is computed by downloading 2000 chunks.
+// getBandwidth returns the average bandwidth (in bytes per second) between the
+// user and the requested resource.  this bandwidth is computed by downloading
+// 2000 chunks.
 func (vs *VideoStreamer) getBandwidth() (float64, error) {
 	tbefore := time.Now()
 	sz := chunkSize * 2000
@@ -96,9 +114,10 @@ func (vs *VideoStreamer) getBandwidth() (float64, error) {
 	return float64(sz) / (time.Since(tbefore).Seconds()), nil
 }
 
-// Stream the remote file into the local file, giving user feedback on progress until they can safely play the file.
+// StartStream buffers the remote file into the local file, giving user
+// feedback on progress until they can safely play the file.
 func (vs *VideoStreamer) StartStream() error {
-	fmt.Println("Calculating available downstream bandwidth...")
+	fmt.Println("Buffering, please wait...")
 	bw, err := vs.getBandwidth()
 	if err != nil {
 		return err
@@ -109,21 +128,26 @@ func (vs *VideoStreamer) StartStream() error {
 	downloadTime := (bw / float64(vs.Size)) * fudgeFactor
 	bufferTime := math.Max(0, downloadTime-vs.Duration.Seconds())
 
-	fmt.Printf("Now buffering your video. %v seconds until you can safely watch this video.\n", bufferTime)
-	chunk := make([]byte, chunkSize)
+	fmt.Printf("%v seconds until you can safely watch this video.\n", bufferTime)
+
 	// Download and write the last chunk first so video players can read the file correctly.
+	chunk := make([]byte, chunkSize)
 	if _, err := vs.fs.Seek(vs.Size-chunkSize, 0); err != nil {
 		return err
 	}
-	io.ReadFull(vs.fs, chunk)
+	if _, err := io.ReadFull(vs.fs, chunk); err != nil {
+		return err
+	}
 	if _, err := vs.fs.Write(chunk); err != nil {
 		return err
 	}
 
-	// Start streaming from the start of the file.
+	// Start streaming from the start of the file. Once `bufferTime` has elapsed,
+	// inform the user that they can safely start playing the file.
 	if _, err := vs.fs.Seek(0, 0); err != nil {
 		return err
 	}
+
 	tstart := time.Now()
 	readynotified := false
 	done := false

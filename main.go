@@ -125,7 +125,7 @@ func (vs *VideoStreamer) StartStream() error {
 	fmt.Printf("Average bandwidth: %v Bytes per second\n", bw)
 
 	// Calculate the amount of time needed to safely play the remote video.
-	downloadTime := (bw / float64(vs.Size)) * fudgeFactor
+	downloadTime := (float64(vs.Size) / bw) * fudgeFactor
 	bufferTime := math.Max(0, downloadTime-vs.Duration.Seconds())
 
 	fmt.Printf("%v seconds until you can safely watch this video.\n", bufferTime)
@@ -135,9 +135,7 @@ func (vs *VideoStreamer) StartStream() error {
 	if _, err := vs.fs.Seek(vs.Size-chunkSize, 0); err != nil {
 		return err
 	}
-	if _, err := io.ReadFull(vs.fs, chunk); err != nil {
-		return err
-	}
+	io.ReadFull(vs.fs, chunk)
 	if _, err := vs.fs.Write(chunk); err != nil {
 		return err
 	}

@@ -9,7 +9,7 @@ autobuffer is a small utility you can use to automatically buffer and stream vid
 ./autobuffer -duration 1h47m -out hackers.mkv -url http://localhost:8080/hackers.mkv
 ```
 
-`autobuffer` will measure your available downstream bandwidth with the remote url, calculate how long it will take to buffer sufficiently to play without interrupt, and start streaming the target file from the server to your local disk.  To play the video, simply use any video player (I tested mplayer, mpv, and VLC) to open the file at the `-out` path you specified.  Note that you must use the correct extension in `-out` or some players may have trouble playing the file.  For all the available flags, just run `autobuffer` with no arguments.
+`autobuffer` will measure your available downstream bandwidth with the remote url, calculate how long it will take to buffer sufficiently to play without interruption, and start streaming the target file from the server to your local disk.  To play the video, simply use any video player (I tested mplayer, mpv, and VLC) to open the file at the `-out` path you specified.  Note that you must use the correct extension in `-out` or some players may have trouble playing the file.  For all the available flags, just run `autobuffer` with no arguments.
 
 ## Inspiration
 

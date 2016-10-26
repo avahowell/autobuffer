@@ -12,12 +12,12 @@ import (
 	"time"
 )
 
-const (
-	// fudgeFactor is used to overestimate buffering time in order to account for
-	// small variation in available bandwidth over the duration of the stream.
-	fudgeFactor = 1.2
-)
+// fudgeFactor is used to overestimate buffering time in order to account for
+// small variation in available bandwidth over the duration of the stream.
+const fudgeFactor = 1.2
 
+// VideoStream streams a remote video to a file over HTTP and informs the user
+// when they can start playing the video safely, without interruptions.
 type VideoStream struct {
 	size     uint64
 	duration time.Duration

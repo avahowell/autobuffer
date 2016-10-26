@@ -100,7 +100,7 @@ func (vs *VideoStream) Stream() error {
 	downloadTime := (float64(vs.size) / bw) * fudgeFactor
 	bufferTime := time.Duration(math.Max(0, downloadTime-vs.duration.Seconds())) * time.Second
 
-	fmt.Printf("%v seconds until you can safely watch this video.\n", bufferTime)
+	fmt.Printf("%v until you can safely watch this video.\n", bufferTime)
 
 	go func() {
 		time.Sleep(bufferTime)

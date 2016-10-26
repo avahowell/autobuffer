@@ -1,4 +1,5 @@
 # autobuffer
+[![Go Report Card](https://goreportcard.com/badge/github.com/johnathanhowell/autobuffer)](https://goreportcard.com/report/github.com/johnathanhowell/autobuffer)
 
 autobuffer is a small utility you can use to automatically buffer and stream video files over HTTP. It streams to a local, on-disk file.  It is only concerned with streaming the data and makes no assumptions about video format.  As such, you must provide autobuffer with the `-duration` flag to receive accurate feedback on how long you should wait to play the streamed file.  Durations are parsed using golang's `time`, so values like `30m`, `1h50m`, etc, all work as expected.  HTTP basic auth is also supported.
 

@@ -89,7 +89,7 @@ func (vs *VideoStream) bandwidth() (float64, error) {
 // Stream buffers the remote file into the local file, giving user
 // feedback on progress until they can safely play the file.
 func (vs *VideoStream) Stream() error {
-	fmt.Println("Buffering, please wait...")
+	fmt.Println("Sampling bandwidth, please wait...")
 	bw, err := vs.bandwidth()
 	if err != nil {
 		return err
@@ -102,11 +102,12 @@ func (vs *VideoStream) Stream() error {
 
 	if bufferTime > 0 {
 		fmt.Printf("%v until you can safely watch this video.\n", bufferTime)
+		fmt.Println("Buffering...")
 	}
 
 	go func() {
 		time.Sleep(bufferTime)
-		fmt.Println("this video is now ready to play.")
+		fmt.Printf("%v is now ready to play.\n", vs.f.Name())
 	}()
 
 	if _, err := ioutil.ReadAll(vs.tee); err != nil {

@@ -75,12 +75,12 @@ func (vs *VideoStream) Close() error {
 }
 
 // bandwidth returns the average bandwidth (in bytes per second) between the
-// user and the requested resource.  this bandwidth is computed by downloading up to 10KB.
+// user and the requested resource.  this bandwidth is computed by downloading up to 10MB.
 func (vs *VideoStream) bandwidth() (float64, error) {
 	tbefore := time.Now()
-	buf := make([]byte, 10000)
-	n, err := vs.tee.Read(buf)
-	if err != nil {
+	buf := make([]byte, 10000000)
+	n, err := io.ReadFull(vs.tee, buf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return 0, err
 	}
 	return float64(n) / (time.Since(tbefore).Seconds()), nil

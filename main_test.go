@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	testSz       = 5000000
+	testSz       = 50000000
 	testFilename = "testout.mkv"
 )
 

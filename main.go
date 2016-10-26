@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -110,7 +109,7 @@ func (vs *VideoStream) Stream() error {
 		fmt.Printf("%v is now ready to play.\n", vs.f.Name())
 	}()
 
-	if _, err := ioutil.ReadAll(vs.tee); err != nil {
+	if _, err := io.Copy(vs.f, vs.res.Body); err != nil {
 		return err
 	}
 	return nil

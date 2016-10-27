@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -77,8 +78,7 @@ func (vs *VideoStream) Close() error {
 // user and the requested resource.  this bandwidth is computed by downloading up to 10MB.
 func (vs *VideoStream) bandwidth() (float64, error) {
 	tbefore := time.Now()
-	buf := make([]byte, 10000000)
-	n, err := io.ReadFull(vs.tee, buf)
+	n, err := io.Copy(ioutil.Discard, vs.tee)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return 0, err
 	}

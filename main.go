@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -52,9 +50,9 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 		return nil, err
 	}
 
-	sz, err := strconv.Atoi(res.Header.Get("Content-Length"))
-	if err != nil {
-		return nil, err
+	sz := res.ContentLength
+	if sz == -1 {
+		return nil, http.ErrMissingContentLength
 	}
 
 	tee := io.TeeReader(res.Body, f)
@@ -102,7 +100,7 @@ func (vs *VideoStream) Stream() error {
 
 	// Calculate the amount of time needed to safely play the remote video.
 	downloadTime := (float64(vs.size) / bw) * fudgeFactor
-	bufferTime := time.Duration(math.Max(0, downloadTime-vs.duration.Seconds())) * time.Second
+	bufferTime := time.Duration(downloadTime-vs.duration.Seconds()) * time.Second
 
 	if bufferTime > 0 {
 		fmt.Printf("%v until you can safely watch this video.\n", bufferTime)

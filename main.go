@@ -12,9 +12,14 @@ import (
 	"time"
 )
 
-// fudgeFactor is used to overestimate buffering time in order to account for
-// small variation in available bandwidth over the duration of the stream.
-const fudgeFactor = 1.2
+const (
+	// fudgeFactor is used to overestimate buffering time in order to account for
+	// small variation in available bandwidth over the duration of the stream.
+	fudgeFactor = 1.2
+
+	// bandwidthSampleSize is the number of bytes to download in order to determine the available download bandwidth.
+	bandwidthSampleSize = 10000000
+)
 
 // VideoStream streams a remote video to a file over HTTP and informs the user
 // when they can start playing the video safely, without interruptions.
@@ -78,7 +83,7 @@ func (vs *VideoStream) Close() error {
 // user and the requested resource.  this bandwidth is computed by downloading up to 10MB.
 func (vs *VideoStream) bandwidth() (float64, error) {
 	tbefore := time.Now()
-	n, err := io.Copy(ioutil.Discard, vs.tee)
+	n, err := io.CopyN(ioutil.Discard, vs.tee, bandwidthSampleSize)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return 0, err
 	}

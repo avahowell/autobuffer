@@ -46,7 +46,7 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 		return nil, err
 	}
 
-	sz, err := strconv.Atoi(res.Header["Content-Length"][0])
+	sz, err := strconv.Atoi(res.Header.Get("Content-Length"))
 	if err != nil {
 		return nil, err
 	}

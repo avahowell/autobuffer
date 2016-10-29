@@ -40,7 +40,11 @@ func TestVideoStreamStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer vs.Close()
+	defer func() {
+		if err := vs.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if err = vs.Stream(); err != nil {
 		t.Fatal(err)
@@ -82,7 +86,11 @@ func TestNewVideoStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer vs.Close()
+	defer func() {
+		if err := vs.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if vs.size != testSz {
 		t.Fatalf("VideoStream created with wrong size, got %v wanted %v\n", vs.size, testSz)

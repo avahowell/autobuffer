@@ -71,13 +71,15 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 // Close closes the underlying file and http response opened by the
 // VideoStream.
 func (vs *VideoStream) Close() error {
-	err := vs.f.Close()
-	if err != nil {
-		return err
+	var errs []error
+	if err := vs.f.Close(); err != nil {
+		errs = append(errs, err)
 	}
-	err = vs.res.Body.Close()
-	if err != nil {
-		return err
+	if err := vs.res.Body.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("error closing VideoStream: %v\n", errs)
 	}
 	return nil
 }

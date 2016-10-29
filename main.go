@@ -72,6 +72,9 @@ func NewVideoStream(url string, duration time.Duration, outfile string, username
 // VideoStream.
 func (vs *VideoStream) Close() error {
 	err := vs.f.Close()
+	if err != nil {
+		return err
+	}
 	err = vs.res.Body.Close()
 	if err != nil {
 		return err

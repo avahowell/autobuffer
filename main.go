@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/cheggaaa/pb"
 )
 
 const (
@@ -107,12 +109,21 @@ func (vs *VideoStream) Stream() error {
 		fmt.Println("Buffering...")
 	}
 
+	remoteReader := vs.res.Body
+	remainingDownloadBytes := int(vs.size) - bandwidthSampleSize
+	if remainingDownloadBytes > 0 {
+		progressbar := pb.New(remainingDownloadBytes).SetUnits(pb.U_BYTES)
+		progressbar.ShowSpeed = true
+		progressbar.Start()
+		remoteReader = progressbar.NewProxyReader(vs.res.Body)
+	}
+
 	go func() {
 		time.Sleep(bufferTime)
 		fmt.Printf("%v is now ready to play.\n", vs.f.Name())
 	}()
 
-	if _, err := io.Copy(vs.f, vs.res.Body); err != nil {
+	if _, err := io.Copy(vs.f, remoteReader); err != nil {
 		return err
 	}
 	return nil
